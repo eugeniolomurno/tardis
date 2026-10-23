@@ -12,6 +12,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
 <style>
 /* Politecnico di Milano web identity: Manrope, navy #102c53, blue #2942db, light blue #67b3ff, grey #e7eef3. */
 /* Layout: a 1120px container; each section is a label column plus a content column, stacked below 900px. */
@@ -143,7 +145,8 @@ figcaption { color: var(--muted); font-size: 0.92rem; max-width: 80ch; }
 figcaption b { color: var(--fg); font-weight: 800; }
 
 /* method */
-.eq { overflow-x: auto; padding: 22px 20px; font-size: 1.15rem; text-align: center; }
+.eq { overflow-x: auto; overflow-y: hidden; padding: 20px; font-size: 1.05rem; text-align: center; line-height: 2.4; }
+.eq-part { display: inline-block; white-space: nowrap; }
 math { font-size: 1.1em; }
 .stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .stage { padding: 22px; display: grid; gap: 10px; align-content: start; border-top: 3px solid var(--c); }
@@ -215,6 +218,7 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
   .hero .container { padding-block: 52px 48px; gap: 22px; }
   .numbers { grid-template-columns: minmax(0, 1fr); }
   .lede { font-size: 1.05rem; }
+  .eq { font-size: 0.9rem; padding: 14px 10px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
 </style>
@@ -291,7 +295,7 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
     <div class="sec-body">
       <h2 id="method-h">Bidirectional Chamfer Refinement</h2>
       <p class="prose">One functional drives both refinement levels. For a representation map φ and two sample sets, the symmetric Chamfer functional adds a fidelity term (synthetic to real) and a coverage term (real to synthetic):</p>
-      <div class="eq card">
+      <div class="eq card" id="eq-chamfer" data-tex="\mathcal{C}(A,B) = \frac{1}{|A|}\sum_{a\in A}\min_{b\in B}\lVert\varphi(a)-\varphi(b)\rVert @@ +\;\frac{1}{|B|}\sum_{b\in B}\min_{a\in A}\lVert\varphi(a)-\varphi(b)\rVert">
         <math display="block">
           <mrow>
             <mi mathvariant="script">C</mi><mo>(</mo><mi>A</mi><mo>,</mo><mi>B</mi><mo>)</mo><mo>=</mo>
@@ -489,6 +493,19 @@ document.getElementById("copy-bib").addEventListener("click", function () {
   function select() {
     var r = document.createRange(); r.selectNodeContents(document.getElementById("bibtex"));
     var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); done("Press Ctrl+C");
+  }
+});
+// KaTeX loads with defer, so render once the document is parsed; the MathML stays as a fallback.
+document.addEventListener("DOMContentLoaded", function () {
+  var eq = document.getElementById("eq-chamfer");
+  if (window.katex && eq) {
+    // The two terms render as separate unbreakable pieces, so a narrow screen wraps only at the "+".
+    try {
+      var html = eq.dataset.tex.split("@@").map(function (t) {
+        return '<span class="eq-part">' + katex.renderToString(t, { throwOnError: true }) + "</span>";
+      });
+      eq.innerHTML = html.join(" ");
+    } catch (e) {}
   }
 });
 (function () {
