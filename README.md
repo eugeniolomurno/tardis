@@ -1,89 +1,125 @@
+<div align="center">
+
 # TARDIS
 
 **Inference-Time Refinement Closes the Synthetic-Real Gap in Tabular Diffusion**
-Eugenio Lomurno, Filippo Balzarini, Francesco Benelle, Francesca Pia Panaccione, Matteo Matteucci
-Politecnico di Milano · *NeurIPS 2026*
+
+Eugenio Lomurno\*, Filippo Balzarini\*, Francesco Benelle\*, Francesca Pia Panaccione\*, Matteo Matteucci<br>
+Politecnico di Milano · *NeurIPS 2026* · \*equal contribution
 
 [Project page](https://eugeniolomurno.github.io/tardis/) · [Paper](docs/static/tardis.pdf) · [Citation](#citation)
 
-TARDIS (**T**abular generation through **R**efinement, **D**istillation, and **I**nference-time **S**ampling) refines the output of a frozen, pre-trained tabular diffusion model (TabDiff) at inference time, with no retraining. Given a dataset, a downstream model (XGBoost by default) and the task, it trains the backbone once, searches a per-dataset configuration, and releases a synthetic dataset on which the downstream model matches or beats the same model trained on the real data.
+</div>
+
+TARDIS (**T**abular generation through **R**efinement, **D**istillation, and **I**nference-time **S**ampling) improves the output of a frozen, pre-trained tabular diffusion model (TabDiff) at inference time, with no retraining. You give it a CSV, a target column and the task; it returns a synthetic dataset on which a downstream model (XGBoost by default) matches or beats the same model trained on the real data.
 
 ![TARDIS pipeline](docs/static/pipeline.png)
-
-| Stage | What it does | Code |
-|---|---|---|
-| I · Oversampling | draws a pool of M·N<sub>r</sub> noise vectors (M = 50) | [`pipeline.py`](tardis/pipeline.py) `candidate_pool` |
-| II · Bidirectional Chamfer guidance | perturbs the score with ∇C(φ(x<sub>t</sub>), φ(x<sub>r</sub>)) during reverse diffusion (Eq. 4) | [`guidance.py`](tardis/guidance.py), [`backbone/diffusion.py`](tardis/backbone/diffusion.py) `_denoise` |
-| III · Refinement selection | keeps K·N<sub>r</sub> rows with one of five samplers, optionally after GKD relabelling | [`samplers.py`](tardis/samplers.py), [`pipeline.py`](tardis/pipeline.py) `select`, `teacher` |
-| Search | TPE over Stage II; each trial returns the best validation utility of the 10-cell Stage III grid | [`pipeline.py`](tardis/pipeline.py) `search`, `suggest_config` |
-
-The Chamfer functional C (Eq. 2) is in [`chamfer.py`](tardis/chamfer.py), the β-VAE map φ in [`vae.py`](tardis/vae.py), the TabDiff backbone in [`backbone/`](tardis/backbone).
 
 ## Installation
 
 ```bash
 git clone https://github.com/eugeniolomurno/tardis.git
 cd tardis
-pip install -e .            # Python >= 3.9, PyTorch >= 2.0, XGBoost >= 2.0, Optuna >= 3.0
+pip install -e .
 ```
 
-A CUDA GPU is strongly recommended: the paper's runs used a single GTX 1080 Ti.
+Requires Python ≥ 3.9 and PyTorch ≥ 2.0. A CUDA GPU is strongly recommended; the paper's runs used a single GTX 1080 Ti.
 
-## Quickstart
+## Usage
+
+One command does everything:
 
 ```bash
 tardis run --data adult.csv --target income --task binclass
 ```
 
-This single command:
+It trains TabDiff once, searches the best configuration on a validation split, reports the test utility and writes the synthetic dataset to `runs/adult/synthetic.csv`.
 
-1. splits the data 90/5/5 (train / validation / test), imputing missing values with the train median or mode;
-2. trains TabDiff on the train split (8,000 epochs) and freezes it;
-3. runs 500 TPE trials of the configuration search against the validation split;
-4. reports the test utility of Real, TabDiff, TARDIS<sub>K=1</sub> and TARDIS over 5 generation runs;
-5. writes the synthetic dataset to `runs/adult/synthetic.csv`.
+`--task` is `binclass`, `multiclass` or `regression`. Non-numeric columns are treated as categorical; use `--cat-cols a b c` to choose them yourself.
 
-`--task` is `binclass`, `multiclass` or `regression`. Non-numeric columns are treated as categorical; pass `--cat-cols a b c` to override. The stages can also be run one at a time:
+### Step by step
 
 ```bash
-tardis train    --data adult.csv --target income --task binclass   # backbone only
-tardis search   --data adult.csv --target income --task binclass --trials 500   # resumable
-tardis generate --data adult.csv --target income --task binclass --seed 0       # uses best_config.json
+tardis train    --data adult.csv --target income --task binclass               # train the backbone
+tardis search   --data adult.csv --target income --task binclass --trials 500  # search (resumable)
+tardis generate --data adult.csv --target income --task binclass               # write synthetic.csv
 ```
 
-`--trials 0` skips the search and applies the fixed global configuration of App. J.3 (Chamfer Sampler, K = 10, no GKD, no guidance), which the full search outperforms on 14 of 15 datasets but costs no search at all. `--K` overrides the cardinality of any configuration.
+### Without the search
 
-### Python API
+```bash
+tardis run --data adult.csv --target income --task binclass --trials 0
+```
+
+`--trials 0` skips the search and uses a fixed configuration (Chamfer Sampler, K = 10). It is much faster; the full search does better on 14 of 15 datasets in the paper.
+
+To control how many rows you get, set `--K` (synthetic rows = K × real training rows) and keep `--M` (candidate pool size) just above it:
+
+```bash
+tardis generate --data adult.csv --target income --task binclass --M 10 --K 1
+```
+
+### Python
 
 ```python
 from tardis import TARDIS, load_dataset
 
 ds = load_dataset("adult.csv", target="income", task="binclass")
-model = TARDIS(ds, workdir="runs/adult", learner="xgboost")
-model.fit_backbone()                   # TabDiff, trained once and then frozen
-cfg = model.search(n_trials=500)       # TardisConfig with Stage II + Stage III choices
-print(model.report(cfg))               # test utility, as in Table 1
+model = TARDIS(ds, workdir="runs/adult")
+model.fit_backbone()
+cfg = model.search(n_trials=500)
+print(model.report(cfg))
 synthetic = model.generate(cfg, seed=0)
 ```
 
-[`examples/quickstart.py`](examples/quickstart.py) runs the whole pipeline on scikit-learn's breast-cancer data with a reduced budget.
+[`examples/quickstart.py`](examples/quickstart.py) runs the whole pipeline on scikit-learn's breast-cancer data with a small budget.
 
-### Downstream learner
+### Options
 
-`--learner` selects the model used for the validation utility, for the GKD teacher and for the report:
+| Option | Default | Meaning |
+|---|---|---|
+| `--learner` | `xgboost` | downstream model: `xgboost`, `mlp`, `linear`, `random_forest` |
+| `--trials` | `500` | search trials; `0` uses the fixed configuration |
+| `--K` | searched | synthetic rows as a multiple of the real training rows |
+| `--M` | `50` | candidate pool as a multiple of the real training rows |
+| `--workdir` | `runs/<csv name>` | where everything is written |
+| `--device` | `cuda` if available | `cuda` or `cpu` |
 
-| `--learner` | Model |
+Run `tardis <command> --help` for the full list.
+
+### Outputs
+
+| File | Content |
 |---|---|
-| `xgboost` (default) | XGBoost, default hyperparameters, ≤ 10,000 rounds, early stopping (patience 250) on the validation split |
-| `mlp` | MLP with hidden layers (128, 64), as in App. L |
-| `linear` | logistic regression / ridge regression, as in App. L |
-| `random_forest` | random forest, 500 trees |
+| `synthetic.csv` | the synthetic dataset, same columns as the input |
+| `report.json` | test utility of Real, TabDiff and TARDIS |
+| `best_config.json` | the configuration found by the search |
+| `tabdiff.pt` | backbone checkpoint, reused by later commands |
+| `search.db` | search state; rerunning `search` resumes it |
+| `tardis.log` | full log of the run |
 
-In Python, `learner` can also be any callable `(task, n_classes, seed) -> obj` whose object has `fit(X, y, X_val, y_val)` and `predict(X)` (see [`learners.py`](tardis/learners.py)).
+## Notes
 
-## Defaults
+<details>
+<summary><b>Where each stage lives in the code</b></summary>
 
-All defaults are the values reported in the paper.
+<br>
+
+| Stage | What it does | Code |
+|---|---|---|
+| I · Oversampling | draws a pool of M·N<sub>r</sub> noise vectors | [`pipeline.py`](tardis/pipeline.py) `candidate_pool` |
+| II · Bidirectional Chamfer guidance | perturbs the score with ∇C(φ(x<sub>t</sub>), φ(x<sub>r</sub>)) during reverse diffusion (Eq. 4) | [`guidance.py`](tardis/guidance.py), [`backbone/diffusion.py`](tardis/backbone/diffusion.py) `_denoise` |
+| III · Refinement selection | keeps K·N<sub>r</sub> rows with one of five samplers, optionally after GKD relabelling | [`samplers.py`](tardis/samplers.py), [`pipeline.py`](tardis/pipeline.py) `select`, `teacher` |
+| Search | TPE over Stage II; each trial returns the best validation utility of the Stage III grid | [`pipeline.py`](tardis/pipeline.py) `search`, `suggest_config` |
+
+The Chamfer functional C (Eq. 2) is in [`chamfer.py`](tardis/chamfer.py), the β-VAE map φ in [`vae.py`](tardis/vae.py), the TabDiff backbone in [`backbone/`](tardis/backbone).
+
+</details>
+
+<details>
+<summary><b>Defaults from the paper</b></summary>
+
+<br>
 
 | | Setting | Value |
 |---|---|---|
@@ -96,9 +132,18 @@ All defaults are the values reported in the paper.
 | Stage III | samplers | Chamfer, MDSampler (k = 10), Stratified, IBOSS, HDBSCAN; each with and without GKD |
 | | GKD teacher | the downstream learner trained on the real train split |
 | Search | outer | Optuna TPE, 500 trials |
-| Report | runs | 5 generation seeds; the learner itself is deterministic |
+| Report | runs | 5 generation seeds |
 
-### Search space (Table 7)
+Downstream learners: XGBoost uses default hyperparameters, up to 10,000 rounds with early stopping (patience 250); `mlp` has hidden layers (128, 64); `linear` is logistic or ridge regression; `random_forest` has 500 trees. In Python, `learner` can also be any callable `(task, n_classes, seed) -> obj` whose object has `fit(X, y, X_val, y_val)` and `predict(X)` (see [`learners.py`](tardis/learners.py)).
+
+With GKD, `synthetic.csv` keeps the hard target and adds the teacher's probabilities as `<target>__p_<class>` columns (classification), or replaces the target with the teacher's prediction (regression).
+
+</details>
+
+<details>
+<summary><b>Search space (Table 7)</b></summary>
+
+<br>
 
 | Parameter | Domain | Scale |
 |---|---|---|
@@ -115,32 +160,12 @@ All defaults are the values reported in the paper.
 
 The guidance parameters exist only when guidance is on, and the β-VAE ones only with the β-VAE map. The Stage III grid (5 samplers × GKD on/off) is evaluated exhaustively inside every trial.
 
-### Choosing M and K without a search
+</details>
 
-The benefit is carried by K, while M mostly sets the cost (Sec. 5, App. J). Set K within the cardinality budget of the downstream application and M just above K; under a budget of K ≈ 1, M ∈ [5, 10] suffices and GKD can be enabled for classification. Example:
+<details>
+<summary><b>Implementation choices the paper leaves open</b></summary>
 
-```bash
-tardis generate --data adult.csv --target income --task binclass --M 10 --K 1 --config my_config.json
-```
-
-## Outputs
-
-Everything is written to `--workdir` (default `runs/<csv name>`):
-
-| File | Content |
-|---|---|
-| `tabdiff.pt` | backbone checkpoint, reused by every later command |
-| `search.db` | Optuna study (SQLite); rerunning `search` resumes it |
-| `best_config.json` | selected configuration (`TardisConfig`) |
-| `report.json` | test utility of Real, TabDiff, TARDIS<sub>K=1</sub>, TARDIS, with Δ% |
-| `synthetic.csv` | released synthetic dataset, K·N<sub>r</sub> rows, same columns as the input |
-| `tardis.log` | log of the run, including every trial's grid |
-
-With GKD the synthetic file keeps the hard target and adds the teacher's probabilities as `<target>__p_<class>` columns (classification) or replaces the target with the teacher's prediction (regression).
-
-## Implementation notes
-
-Choices the paper leaves open, fixed here once:
+<br>
 
 - **Guidance steps.** Guidance is applied every t<sub>g</sub> steps of the 50-step reverse trajectory, on both the Euler and the second-order denoiser calls; the gradient flows through the backbone's prediction of the clean sample to the numerical columns (categorical columns are discrete and receive no gradient).
 - **Chamfer gradient.** Nearest neighbours are found without gradient and the matched distances are recomputed with gradient: this is the exact (sub)gradient of Eq. 2 at O(|A| + |B|) memory.
@@ -149,6 +174,8 @@ Choices the paper leaves open, fixed here once:
 - **Chamfer Sampler.** The pool is split into 10 batches (b = M·N<sub>r</sub> / 10).
 - **HDBSCAN Sampler.** Fitted on at most 20,000 candidates (the rest join their nearest fitted neighbour's cluster); a cluster's density is its size over its mean distance to the centroid.
 - **Backbone checkpoint.** The EMA weights with the lowest training loss in the second half of training.
+
+</details>
 
 ## Citation
 
@@ -161,6 +188,20 @@ Choices the paper leaves open, fixed here once:
 }
 ```
 
-## License and acknowledgements
+## License
 
-MIT, see [LICENSE](LICENSE). The backbone in [`tardis/backbone/`](tardis/backbone) is adapted from the official [TabDiff](https://github.com/MinkaiXu/TabDiff) implementation (Shi et al., ICLR 2025); see [NOTICE](NOTICE).
+Released under the [MIT License](LICENSE).
+
+The backbone in [`tardis/backbone/`](tardis/backbone) is adapted from the official [TabDiff](https://github.com/MinkaiXu/TabDiff) implementation (Shi et al., ICLR 2025). Those files remain subject to the licenses of the original projects; see [NOTICE](NOTICE).
+
+## Contact
+
+For questions or collaboration:
+
+- Eugenio Lomurno: [eugenio.lomurno@polimi.it](mailto:eugenio.lomurno@polimi.it)
+- Francesca Pia Panaccione: [francescapia.panaccione@polimi.it](mailto:francescapia.panaccione@polimi.it)
+- Matteo Matteucci: [matteo.matteucci@polimi.it](mailto:matteo.matteucci@polimi.it)
+
+---
+
+<p align="center">Made with ❤️ at Politecnico di Milano</p>
