@@ -163,4 +163,4 @@ Choices the paper leaves open, fixed here once:
 
 ## License and acknowledgements
 
-MIT, see [LICENSE](LICENSE). The backbone in [`tardis/backbone/`](tardis/backbone) is adapted from the official [TabDiff](https://github.com/MinkaiXu/TabDiff) implementation (Shi et al., ICLR 2025); see [NOTICE](NOTICE). This work is supported by Fondazione Regionale per la Ricerca Biomedica (Regione Lombardia), project ID 012024R0055 PREDICT.
+MIT, see [LICENSE](LICENSE). The backbone in [`tardis/backbone/`](tardis/backbone) is adapted from the official [TabDiff](https://github.com/MinkaiXu/TabDiff) implementation (Shi et al., ICLR 2025); see [NOTICE](NOTICE).
