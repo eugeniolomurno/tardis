@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TARDIS · NeurIPS 2026</title>
+<script>try { if (localStorage.getItem("theme") === "dark") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
 <meta name="description" content="TARDIS refines a frozen tabular diffusion backbone at inference time and closes the synthetic-real utility gap. NeurIPS 2026.">
 <meta property="og:title" content="Inference-Time Refinement Closes the Synthetic-Real Gap in Tabular Diffusion">
 <meta property="og:description" content="TARDIS: Tabular generation through Refinement, Distillation, and Inference-time Sampling. NeurIPS 2026.">
@@ -37,15 +38,6 @@
   --body: "Manrope", "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0a1a31; --alt: #0d2140; --surface: #102c53; --sunken: #0d2342; --fg: #e7eef3; --muted: #9fb2c6; --line: #1f3d66;
-    --brand: #67b3ff; --brand-hover: #8cc6ff; --tint: rgba(103, 179, 255, 0.16);
-    --stage1: #a68bff; --stage2: #f2934a; --stage3: #4cc47d; --pos: #67b3ff; --neg: #4f6683;
-    --code-bg: #071326; --shadow: 0 16px 48px 0 rgba(0, 0, 0, 0.35);
-    color-scheme: dark;
-  }
 }
 :root[data-theme="dark"] {
   --bg: #0a1a31; --alt: #0d2140; --surface: #102c53; --sunken: #0d2342; --fg: #e7eef3; --muted: #9fb2c6; --line: #1f3d66;
@@ -85,6 +77,16 @@ sub, sup { line-height: 0; }
 .topbar nav { display: flex; gap: 26px; font-size: 0.92rem; font-weight: 600; }
 .topbar nav a { text-decoration: none; color: var(--fg); }
 .topbar nav a:hover { color: var(--brand); }
+.tools { display: flex; align-items: center; gap: 22px; }
+.theme {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: transparent; color: var(--fg); border: 1.5px solid var(--line); transition: border-color 0.15s ease, color 0.15s ease;
+}
+.theme:hover { border-color: var(--brand); color: var(--brand); }
+.theme svg { width: 18px; height: 18px; }
+.theme .sun { display: none; }
+[data-theme="dark"] .theme .sun { display: block; }
+[data-theme="dark"] .theme .moon { display: none; }
 
 /* hero */
 .hero { position: relative; overflow: hidden; background: radial-gradient(ellipse 60% 80% at 90% 0%, var(--tint), transparent 70%), var(--bg); }
@@ -222,9 +224,15 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
 <div class="topbar">
   <div class="container">
     <a class="wordmark" href="#top">TARDIS</a>
-    <nav aria-label="Sections">
-      <a href="#overview">Overview</a><a href="#method">Method</a><a href="#results">Results</a><a href="#code">Code</a><a href="#citation">Cite</a><a href="#contact">Contact</a>
-    </nav>
+    <div class="tools">
+      <nav aria-label="Sections">
+        <a href="#overview">Overview</a><a href="#method">Method</a><a href="#results">Results</a><a href="#code">Code</a><a href="#citation">Cite</a><a href="#contact">Contact</a>
+      </nav>
+      <button class="theme" id="theme" type="button" aria-label="Switch to dark theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -265,7 +273,7 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
       <div class="numbers">
         <div class="card"><strong>+8.6%</strong><small>median downstream gain over models trained on real data (12/15 strict wins, Wilcoxon p = 0.008)</small></div>
         <div class="card"><strong>15 / 15</strong><small>datasets improved over the TabDiff backbone (mean +13.1%, p &lt; 10<sup>−4</sup>)</small></div>
-        <div class="card"><strong>1–80 min</strong><small>apply-time cost on a single 2017 GTX 1080 Ti, with no retraining</small></div>
+        <div class="card"><strong>1–80 min</strong><small>apply-time cost on a single 2017 GTX 1080 Ti, with no retraining; 4.5× faster on an NVIDIA L40S (median)</small></div>
       </div>
       <figure>
         <div class="figframe">
@@ -483,6 +491,17 @@ document.getElementById("copy-bib").addEventListener("click", function () {
     var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); done("Press Ctrl+C");
   }
 });
+(function () {
+  var root = document.documentElement, btn = document.getElementById("theme");
+  function label() { btn.setAttribute("aria-label", root.dataset.theme === "dark" ? "Switch to light theme" : "Switch to dark theme"); }
+  label();
+  btn.addEventListener("click", function () {
+    var dark = root.dataset.theme !== "dark";
+    if (dark) { root.dataset.theme = "dark"; } else { delete root.dataset.theme; }
+    try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) {}
+    label();
+  });
+})();
 </script>
 </body>
 </html>

@@ -23,7 +23,7 @@ cd tardis
 pip install -e .
 ```
 
-Requires Python ≥ 3.9 and PyTorch ≥ 2.0. A CUDA GPU is strongly recommended; the paper's runs used a single GTX 1080 Ti.
+Requires Python ≥ 3.9 and PyTorch ≥ 2.0. A CUDA GPU is strongly recommended. On a single 2017 GTX 1080 Ti, refining a dataset takes 1 to 80 minutes; on an NVIDIA L40S it is 4.5× faster (median), and the one-time TabDiff training takes 2 to 6 hours.
 
 ## Usage
 
