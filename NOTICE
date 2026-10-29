@@ -1,0 +1,7 @@
+tardis/backbone/network.py and tardis/backbone/diffusion.py are adapted from
+TabDiff (https://github.com/MinkaiXu/TabDiff), Shi et al., "TabDiff: a Mixed-type
+Diffusion Model for Tabular Data Generation", ICLR 2025, which in turn builds on
+tab-ddpm (https://github.com/yandex-research/tab-ddpm), TabSyn
+(https://github.com/amazon-science/tabsyn) and MDLM
+(https://github.com/kuleshov-group/mdlm). Those parts remain subject to the
+licenses of the original projects.
