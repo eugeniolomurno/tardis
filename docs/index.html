@@ -8,7 +8,7 @@
 <meta name="description" content="TARDIS refines a frozen tabular diffusion backbone at inference time and closes the synthetic-real utility gap. NeurIPS 2026.">
 <meta property="og:title" content="Inference-Time Refinement Closes the Synthetic-Real Gap in Tabular Diffusion">
 <meta property="og:description" content="TARDIS: Tabular generation through Refinement, Distillation, and Inference-time Sampling. NeurIPS 2026.">
-<meta property="og:image" content="static/pipeline.png">
+<meta property="og:image" content="https://eugeniolomurno.github.io/tardis/static/pipeline.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -281,7 +281,7 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
       </div>
       <figure>
         <div class="figframe">
-          <img src="static/pipeline.png" width="1618" height="948" alt="TARDIS pipeline: Stage I oversamples a noise pool of M times N_r rows; Stage II denoises it while perturbing the score with the gradient of the Chamfer functional against the real reference set in phi-space; Stage III selects K times N_r rows with a Chamfer Sampler, optionally after GKD relabelling, choosing the variant with the best validation utility.">
+          <img src="static/pipeline.png" width="1800" height="1012" alt="TARDIS pipeline: Stage I oversamples a noise pool of M times N_r rows; Stage II denoises it while perturbing the score with the gradient of the Chamfer functional against the real reference set in phi-space; Stage III selects K times N_r rows with a Chamfer Sampler, optionally after GKD relabelling, choosing the variant with the best validation utility.">
         </div>
         <figcaption><b>Figure 1.</b> The pipeline in its BCR-headline configuration (β-VAE map in Stage II, Chamfer Sampler). The full framework also covers disabled guidance, the identity map, and a grid of four samplers.</figcaption>
       </figure>
@@ -314,7 +314,7 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
       <p class="prose">Stage II minimises C continuously, by gradient during sampling, with φ either the identity on z-scored features or the encoder of a tabular β-VAE trained on the real records; Stage III minimises it discretely, by ranking batches of candidates on z-scored one-hot features.</p>
       <div class="stages">
         <div class="stage card s1"><span class="num">I</span><h3>Oversampling</h3><p>Draw M·N<sub>r</sub> noise vectors from the frozen backbone's prior (M = 50), so every retained row is chosen among many candidates.</p></div>
-        <div class="stage card s2"><span class="num">II</span><h3>Bidirectional Chamfer guidance</h3><p>Denoise the pool while perturbing the predicted score, ε̃ = ε − Γ(t)·∇<sub>x<sub>t</sub></sub>C(φ(x<sub>t</sub>), φ(x<sub>r</sub>)), against the real records, held fixed across steps and matched by class (by target cluster for regression) or globally.</p></div>
+        <div class="stage card s2"><span class="num">II</span><h3>Bidirectional Chamfer guidance</h3><p>Denoise the pool while perturbing the predicted score, ε̃ = ε − Γ(t)·∇<sub>x<sub>t</sub></sub>C(x<sub>t</sub>, x<sub>r</sub>), against the real records, held fixed across steps and matched by class (by target cluster for regression) or globally.</p></div>
         <div class="stage card s3"><span class="num">III</span><h3>Refinement selection</h3><p>Keep K·N<sub>r</sub> rows with the Chamfer Sampler or one of three alternatives, optionally after relabelling with a teacher's soft labels (GKD). The variant with the best validation utility wins.</p></div>
       </div>
       <p class="prose">A Tree-structured Parzen Estimator searches Stage II per dataset (K, guidance on or off, φ, Γ(t), reference matching, latent sampler). Every trial runs the Stage III grid of four samplers × GKD on/off and returns its best validation utility. On 9 of 15 datasets the search lands on the BCR region: guidance on and Chamfer selection.</p>
@@ -379,7 +379,7 @@ ul.tips { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; color: var(--
 <text x="310.4" y="294.0" class="val" text-anchor="start">+0.4</text>
 <text x="146" y="318.0" class="lab" text-anchor="end">Diamonds <tspan class="task">MC</tspan></text>
 <rect x="300.9" y="307" width="1.5" height="14" rx="2" class="pos"/>
-<text x="306.9" y="318.0" class="val" text-anchor="start">+0.0</text>
+<text x="306.9" y="318.0" class="val" text-anchor="start">0.0</text>
 <text x="146" y="342.0" class="lab" text-anchor="end">Adult <tspan class="task">BC</tspan></text>
 <rect x="298.3" y="331" width="2.6" height="14" rx="2" class="neg"/>
 <text x="292.3" y="342.0" class="val" text-anchor="end">-0.3</text>
@@ -440,8 +440,8 @@ model = TARDIS(ds, workdir="runs/adult")
 cfg = model.search(n_trials=500)
 synthetic = model.generate(cfg)</code></pre></div>
       <ul class="tips">
-        <li>Practical defaults from the paper: set K to the downstream cardinality budget and M just above it; under K ≈ 1, M between 5 and 10 suffices and GKD helps on classification.</li>
-        <li><code>--trials 0</code> skips the search and applies a fixed configuration (Chamfer Sampler, K = 10).</li>
+        <li>Practical defaults from the paper: set K to the downstream cardinality budget and M just above it; under K ≈ 1, M between 5 and 10 suffices and GKD can be enabled on classification.</li>
+        <li><code>--trials 0</code> skips the search and applies a fixed configuration (Chamfer Sampler, K = 10, no GKD, no guidance).</li>
       </ul>
     </div>
   </div>

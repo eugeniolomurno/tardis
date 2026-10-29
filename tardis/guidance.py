@@ -25,7 +25,7 @@ def gamma_schedule(kind: str, g_min: float, g_max: float, s: int, T: int) -> flo
 
 
 class ChamferGuidance:
-    """Score perturbation  eps~ = eps - Gamma(t) * grad_{x_t} C(phi(x_t), phi(x_r))   (Eq. 4).
+    """Score perturbation  eps~ = eps - Gamma(t) * grad_{x_t} C(x_t, x_r)   (Eq. 4).
 
     The functional is evaluated on the backbone's prediction of the clean sample and
     differentiated w.r.t. the noisy numerical coordinates. The reference set x_r is D_real,
@@ -83,8 +83,7 @@ class ChamferGuidance:
         return [(real, chunk) for chunk in gen.split(n_r)]
 
     def _class_pairs(self, x0, gen):
-        """Conditional matching (App. C.3). Classes are visited in index order; when a class
-        has fewer real records than candidates, its pairs replace those of earlier classes."""
+        """Conditional matching (App. C.3)."""
         target = x0[:, self.ti]
         if self.task == "regression":
             labels = self.kmeans.predict(target.detach().cpu().numpy()[:, None])

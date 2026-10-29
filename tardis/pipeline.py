@@ -7,7 +7,7 @@ Stage III select K * N_r rows from the candidate pool with one of four samplers,
 Stage II hyperparameters are searched with TPE; each trial's objective is the best validation
 utility of the Stage III grid (4 samplers x GKD on/off), each cell averaging five evaluation seeds.
 When a trial selects beta-VAE mapping or the latent sampler, an inner TPE study first
-selects the beta-VAE (Table 7b).
+selects the beta-VAE (Table 8).
 """
 
 import json
@@ -222,7 +222,7 @@ class TARDIS:
         return score(self.ds.task, best)
 
     def inner_study(self, cfg: TardisConfig):
-        """beta-VAE inner study (Table 7b): a separate TPE study whose objective is the utility of
+        """beta-VAE inner study (Table 8): a separate TPE study whose objective is the utility of
         a uniformly random subset of K * N_r candidates, averaged over five seeds. Returns the
         selected beta-VAE and the candidate pool generated with it."""
         best = {"score": -np.inf, "pool": None}
@@ -323,7 +323,7 @@ def suggest_config(trial: optuna.Trial, k_max: float = 25.0) -> TardisConfig:
 
 
 def suggest_vae(trial: optuna.Trial) -> VAEConfig:
-    """beta-VAE search space of Table 7b."""
+    """beta-VAE search space of Table 8."""
     v = VAEConfig(
         n_layers=trial.suggest_int("n_layers", 1, 6),
         latent_dim=trial.suggest_categorical("latent_dim", VAE_LATENT_DIMS),

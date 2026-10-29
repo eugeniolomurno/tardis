@@ -1,5 +1,6 @@
-"""Downstream learners A. XGBoost is the learner of the paper; the others are the
-zero-shot transfer learners of App. L.
+"""Downstream learners A. XGBoost is the learner of the paper; the MLP and the linear
+models are two of the zero-shot transfer learners of App. L, and the random forest is an
+additional option.
 
 A learner is fitted on ``(X, y)`` where ``y`` is either a hard target (class index or
 normalised regression value) or a GKD soft target (probability of class 1 for binary

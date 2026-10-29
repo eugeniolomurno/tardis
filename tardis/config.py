@@ -12,7 +12,7 @@ POOL_MULTIPLIER = 50
 # Stage III grid (Sec. 3.3, App. D): four samplers x GKD on/off = 8 combinations per trial.
 SAMPLERS = ("chamfer", "md", "stratified", "iboss")
 
-# Seeds averaged by every cell of the Stage III grid and by the report (Sec. 4).
+# Seeds averaged by every cell of the Stage III grid and by the report (App. F.3).
 EVAL_SEEDS = (0, 1, 2, 3, 4)
 
 # Stage II search space (Table 7).
@@ -22,7 +22,7 @@ GAMMA_CONSTANT = 0.05  # Gamma of the constant family (Eq. 6)
 REF_RATIOS = {"none": None, "1": 1.0, "1/2": 0.5, "1/4": 0.25, "1/8": 0.125, "1/10": 0.1}
 TARGET_CLUSTERS = 5  # k-means clusters of the target for conditional matching in regression (App. C.3)
 
-# beta-VAE inner study (Table 7b).
+# beta-VAE inner study (Table 8).
 VAE_LATENT_DIMS = (4, 8, 16, 32)
 BETA_SCHEDULES = ("constant", "linear", "cosine", "sine", "cyclical")
 INNER_TRIALS = 20
@@ -52,7 +52,7 @@ class BackboneConfig:
 
 @dataclass
 class VAEConfig:
-    """Tabular beta-VAE (Eq. 3). One point of the inner study of Table 7b; the defaults are
+    """Tabular beta-VAE (Eq. 3). One point of the inner study of Table 8; the defaults are
     used when no inner study runs."""
 
     latent_dim: int = 16
@@ -75,8 +75,8 @@ class VAEConfig:
 class TardisConfig:
     """One point of the TARDIS search space.
 
-    The defaults are the fixed global configuration of App. J.3
-    (Chamfer Sampler at K = 10, no GKD, no guidance)."""
+    The defaults are the fixed configuration of App. J.3 (Chamfer Sampler at K = 10,
+    no GKD); without a search, the pool is unguided."""
 
     K: float = 10.0  # cardinality multiplier: the output has K * N_r rows
     # Stage II

@@ -23,7 +23,7 @@ cd tardis
 pip install -e .
 ```
 
-Requires Python ≥ 3.9 and PyTorch ≥ 2.0. A CUDA GPU is strongly recommended. On a single 2017 GTX 1080 Ti, refining a dataset takes 1 to 80 minutes; on an NVIDIA L40S it is 4.5× faster (median), and the one-time TabDiff training takes 2 to 6 hours.
+Requires Python ≥ 3.9 and PyTorch ≥ 2.0. A CUDA GPU is strongly recommended. Applying a searched configuration takes 1 to 80 minutes on a 2017 GTX 1080 Ti and is 4.5× faster on an NVIDIA L40S (median). These times exclude the configuration search and the one-time TabDiff training (2 to 6 hours on the L40S).
 
 ## Usage
 
@@ -51,7 +51,7 @@ tardis generate --data adult.csv --target income --task binclass               #
 tardis run --data adult.csv --target income --task binclass --trials 0
 ```
 
-`--trials 0` skips the search and uses a fixed configuration (Chamfer Sampler, K = 10). It is much faster; the full search does better on 14 of 15 datasets in the paper.
+`--trials 0` skips the search and uses a fixed configuration (Chamfer Sampler, K = 10, no GKD, no guidance). It is much faster; the full search does better on 14 of 15 datasets in the paper.
 
 To control how many rows you get, set `--K` (synthetic rows = K × real training rows) and keep `--M` (candidate pool size) just above it:
 
@@ -111,7 +111,7 @@ Run `tardis <command> --help` for the full list.
 | Stage | What it does | Code |
 |---|---|---|
 | I · Oversampling | draws a pool of M·N<sub>r</sub> noise vectors | [`pipeline.py`](tardis/pipeline.py) `candidate_pool` |
-| II · Bidirectional Chamfer guidance | perturbs the score with ∇C(φ(x<sub>t</sub>), φ(x<sub>r</sub>)) during reverse diffusion (Eq. 4) | [`guidance.py`](tardis/guidance.py), [`backbone/diffusion.py`](tardis/backbone/diffusion.py) `_denoise` |
+| II · Bidirectional Chamfer guidance | perturbs the score with ∇<sub>x<sub>t</sub></sub>C(x<sub>t</sub>, x<sub>r</sub>) during reverse diffusion (Eq. 4) | [`guidance.py`](tardis/guidance.py), [`backbone/diffusion.py`](tardis/backbone/diffusion.py) `_denoise` |
 | III · Refinement selection | keeps K·N<sub>r</sub> rows with one of four samplers, optionally after GKD relabelling | [`samplers.py`](tardis/samplers.py), [`pipeline.py`](tardis/pipeline.py) `select`, `teacher` |
 | Search | TPE over Stage II; each trial returns the best validation utility of the Stage III grid, after a β-VAE inner study when the trial needs one | [`pipeline.py`](tardis/pipeline.py) `search`, `suggest_config`, `inner_study` |
 
@@ -132,10 +132,10 @@ The Chamfer functional C (Eq. 2) and its Stage II form are in [`chamfer.py`](tar
 | Backbone | TabDiff | learnable per-column noise schedules, 50 diffusion steps, 2-layer transformer (d<sub>token</sub> = 4), 8,000 epochs, batch 4,096, AdamW lr 10<sup>-3</sup>, EMA 0.997 |
 | Stage I | pool multiplier M | 50 |
 | Stage II | guidance | every t<sub>g</sub> of the 50 reverse steps; Γ = 0.05 for the constant family |
-| | reference matching | global for batching ratio None or 1; for r < 1, by class (classification) or by k-means cluster of the target (k = 5, regression) |
+| | reference matching | global for batching ratio None or 1; below 1, by class (classification) or by k-means cluster of the target (k = 5, regression) |
 | Stage III | samplers | Chamfer, MDSampler (k = 10), Stratified, IBOSS; each with and without GKD |
 | | GKD teacher | XGBoost trained on one half of the real train split, early-stopped on the other half |
-| Search | outer | Optuna TPE, 500 trials |
+| Search | outer | Optuna TPE, 500 trials (500 or 1,000 in the paper) |
 | | inner | β-VAE study, 20 trials, when a trial selects β-VAE mapping or the latent sampler |
 | Evaluation | seeds | the candidate pool is generated once per configuration; every grid cell and the report average five runs (seeds 0–4), which change only the half of the real training data the GKD teacher is trained on and the selection of the stochastic samplers (Stratified, IBOSS); XGBoost has a fixed seed and a fixed split, so `± —` marks results whose five runs coincide (deterministic sampler without GKD) |
 
@@ -166,7 +166,7 @@ The guidance parameters exist only when guidance is on. The Stage III grid (4 sa
 </details>
 
 <details>
-<summary><b>β-VAE inner study (Table 7b)</b></summary>
+<summary><b>β-VAE inner study (Table 8)</b></summary>
 
 <br>
 
@@ -176,7 +176,7 @@ The guidance parameters exist only when guidance is on. The Stage III grid (4 sa
 | latent dimension d | {4, 8, 16, 32} | categorical |
 | β<sub>max</sub> | [0.5, 10] | log |
 | β(t) schedule | {constant, linear, cosine, sine, cyclical} | categorical |
-| warmup W (non-constant schedules) | [10, 100] epochs | integer |
+| warmup W (linear, cosine, sine) | [10, 100] epochs | integer |
 | T<sub>cyc</sub> (cyclical) | [5, 30] epochs | integer |
 | dropout | [0, 0.4] | linear |
 | batch norm, skip connections | {on, off} | categorical |
@@ -192,10 +192,10 @@ The inner study is a separate TPE study run for each outer configuration that se
 
 <br>
 
-- **Guidance.** Guidance is applied at the steps s = t<sub>g</sub>, 2t<sub>g</sub>, … of the 50-step reverse trajectory, on both the Euler and the second-order denoiser evaluations of a step. The perturbation is the gradient, with respect to the noisy numerical coordinates, of the bidirectional Chamfer functional evaluated on the backbone's prediction of the clean sample, with squared Euclidean distances scaled by 1/(4d). Categorical coordinates are discrete and receive no gradient, so guidance has no effect on datasets without numerical features.
+- **Guidance.** Guidance is applied at the steps s = t<sub>g</sub>, 2t<sub>g</sub>, … of the 50-step reverse trajectory, on both the Euler and the second-order denoiser evaluations of a step. The perturbation is the gradient, with respect to the noisy numerical coordinates, of the bidirectional Chamfer functional evaluated on the backbone's prediction of the clean sample, with squared Euclidean distances scaled by 1/(4d).
 - **Representation map φ.** The identity map z-scores the backbone's numerical encoding (quantile-normalised numerical columns, integer category codes) with the statistics of the set it is applied to; the β-VAE map takes the posterior mean of the encoder.
 - **Γ(t).** With s the reverse step, constant: Γ = 0.05; linear: γ<sub>max</sub> + (γ<sub>min</sub> − γ<sub>max</sub>)·s/T; cosine: γ<sub>min</sub> + ½(γ<sub>max</sub> − γ<sub>min</sub>)(1 + cos(πs/T)); sine: γ<sub>max</sub> − ½(γ<sub>max</sub> − γ<sub>min</sub>)(1 + cos(πs/T)).
-- **Reference matching.** With batching ratio r < 1, the larger of the real and candidate sets of a class is split into chunks of r times the real class size, each chunk is matched against the whole smaller set, the class is also matched as a whole, and the functional is averaged over all matched pairs. Classes are visited in index order; when a class has fewer real records than candidates, its pairs replace those of earlier classes.
+- **Reference matching.** With a batching ratio below 1, the larger of the real and candidate sets of a class is split into chunks whose size is the ratio times the real class size, each chunk is matched against the whole smaller set, the class is also matched as a whole, and the functional is averaged over all matched pairs.
 - **β(t).** Constant: β<sub>max</sub>; linear: β<sub>max</sub>·t/W; cosine: β<sub>min</sub> + ½(β<sub>max</sub> − β<sub>min</sub>)(1 + cos(πt/W)); sine: β<sub>max</sub> − ½(β<sub>max</sub> − β<sub>min</sub>)(1 + cos(πt/W)); all equal β<sub>max</sub> from epoch W on; cyclical: β<sub>max</sub>·(t mod T<sub>cyc</sub>)/T<sub>cyc</sub>; β<sub>min</sub> = 0.5.
 - **Chamfer Sampler.** Candidate features (target excluded) are one-hot encoded and z-scored on D<sub>real</sub> ∪ D<sub>cand</sub>; the pool is split in generation order into ten batches, each scored by C(B<sub>k</sub>, D<sub>real</sub>) with Euclidean distances; the best batches are kept until K·N<sub>r</sub> rows, the last one contributing its first rows.
 - **MDSampler.** d(x) = max(0, ‖x − r\*‖² − ρ<sub>k</sub>(r\*)²), with r\* the nearest real record and ρ<sub>k</sub>(r) the distance from r to its k-th nearest real record (k = 10, r itself included), on one-hot encoded records with the target, or on β-VAE posterior means with the latent sampler.
